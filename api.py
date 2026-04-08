@@ -16,15 +16,14 @@ with open("model.pkl", "rb") as f:
 # ---------------- LOAD CALENDAR ---------------- #
 
 import os
-calanderURL= 'https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/2026_calander.csv'
-attandanceURL='https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/attendance.csv'
+PUBLIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
 
-calendar_df = pd.read_csv(calanderURL)
+calendar_df = pd.read_csv(os.path.join(PUBLIC_DIR, "2026_calander.csv"))
 calendar_df["date"] = pd.to_datetime(calendar_df["date"], dayfirst=True)
 
 # ---------------- LOAD ATTENDANCE HISTORY ---------------- #
 
-attendance_df = pd.read_csv(attandanceURL)
+attendance_df = pd.read_csv(os.path.join(PUBLIC_DIR, "attendance.csv"))
 attendance_df["date"] = pd.to_datetime(attendance_df["date"], dayfirst=True)
 attendance_df = attendance_df.sort_values("date").reset_index(drop=True)
 
@@ -367,4 +366,7 @@ def predict_range():
 # ---------------- RUN ---------------- #
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    # Render provides the port via the PORT environment variable.
+    # Locally, this falls back to 8000.
+    port = int(os.environ.get("PORT", 8000))
+    app.run(debug=False, host="0.0.0.0", port=port)
