@@ -16,7 +16,7 @@ with open("model.pkl", "rb") as f:
 # ---------------- LOAD CALENDAR ---------------- #
 
 import os
-calanderURL= 'https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/2026_calander.cs'
+calanderURL= 'https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/2026_calander.csv'
 attandanceURL='https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/attendance.csv'
 
 calendar_df = pd.read_csv(calanderURL)
