@@ -18,12 +18,34 @@ with open("model.pkl", "rb") as f:
 import os
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
 
-calendar_df = pd.read_csv(os.path.join(PUBLIC_DIR, "2026_calander.csv"))
+# Primary source: online CSV from GitHub (kept in sync with repo)
+CALENDAR_CSV_URL = (
+    "https://raw.githubusercontent.com/"
+    "bhavinSOL/TATA-Attendance/refs/heads/main/public/2026_calander.csv"
+)
+
+try:
+    calendar_df = pd.read_csv(CALENDAR_CSV_URL)
+    print("✅ Loaded calendar from remote URL")
+except Exception as e:
+    print(f"⚠️ Remote calendar load failed ({e}); falling back to local file")
+    calendar_df = pd.read_csv(os.path.join(PUBLIC_DIR, "2026_calander.csv"))
+
 calendar_df["date"] = pd.to_datetime(calendar_df["date"], dayfirst=True)
 
 # ---------------- LOAD ATTENDANCE HISTORY ---------------- #
 
-attendance_df = pd.read_csv(os.path.join(PUBLIC_DIR, "attendance.csv"))
+ATTENDANCE_CSV_URL = (
+    "https://raw.githubusercontent.com/"
+    "bhavinSOL/TATA-Attendance/refs/heads/main/public/attendance.csv"
+)
+
+try:
+    attendance_df = pd.read_csv(ATTENDANCE_CSV_URL)
+    print("✅ Loaded attendance from remote URL")
+except Exception as e:
+    print(f"⚠️ Remote attendance load failed ({e}); falling back to local file")
+    attendance_df = pd.read_csv(os.path.join(PUBLIC_DIR, "attendance.csv"))
 attendance_df["date"] = pd.to_datetime(attendance_df["date"], dayfirst=True)
 attendance_df = attendance_df.sort_values("date").reset_index(drop=True)
 
