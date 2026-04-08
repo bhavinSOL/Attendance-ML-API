@@ -16,14 +16,15 @@ with open("model.pkl", "rb") as f:
 # ---------------- LOAD CALENDAR ---------------- #
 
 import os
-PUBLIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
+calanderURL= 'https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/2026_calander.cs'
+attandanceURL='https://raw.githubusercontent.com/bhavinSOL/TATA-Attendance/refs/heads/main/public/attendance.csv'
 
-calendar_df = pd.read_csv(os.path.join(PUBLIC_DIR, "2026_calander.csv"))
+calendar_df = pd.read_csv(calanderURL)
 calendar_df["date"] = pd.to_datetime(calendar_df["date"], dayfirst=True)
 
 # ---------------- LOAD ATTENDANCE HISTORY ---------------- #
 
-attendance_df = pd.read_csv(os.path.join(PUBLIC_DIR, "attendance.csv"))
+attendance_df = pd.read_csv(attandanceURL)
 attendance_df["date"] = pd.to_datetime(attendance_df["date"], dayfirst=True)
 attendance_df = attendance_df.sort_values("date").reset_index(drop=True)
 
