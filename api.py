@@ -237,48 +237,9 @@ def predict_day():
     features = build_features(date)
     model_prediction = model.predict(features)[0]
 
-    # Check if this is a normal working day (not holiday/festival)
-    selected_date = pd.to_datetime(date)
-    cal_row = calendar_df[calendar_df["date"] == selected_date]
-    is_holiday = int(cal_row.iloc[0].get("is_holiday", 0)) if len(cal_row) > 0 else 0
-    is_festival = int(cal_row.iloc[0].get("is_festival", 0)) if len(cal_row) > 0 else 0
-    is_normal_day = (is_holiday == 0 and is_festival == 0)
-
-    # Holidays/Sundays/Off days: pure model prediction, no hybrid
-    if not is_normal_day:
-        return jsonify({
-            "date": date,
-            "predicted_absentees_percentage": f"{round(float(model_prediction), 2)}%",
-            "model_only_prediction": f"{round(float(model_prediction), 2)}%",
-            "is_normal_day": False,
-            "normal_day_cap": None,
-            "recent_context": None
-        })
-
-    # Normal working days: hybrid with prev actual data + cap
-    prev_3_days, prev_3_day_avg = get_previous_days_attendance(
-        date, num_days=3, only_working_days=True
-    )
-    prev_week_info = get_previous_week_attendance(
-        date, only_working_days=True
-    )
-    prev_week_avg = prev_week_info["previous_week_avg"]
-
-    final_prediction = hybrid_prediction(
-        model_prediction, prev_3_day_avg, prev_week_avg, is_normal_day=True
-    )
-
     return jsonify({
         "date": date,
-        "predicted_absentees_percentage": f"{round(float(final_prediction), 2)}%",
-        "model_only_prediction": f"{round(float(model_prediction), 2)}%",
-        "is_normal_day": is_normal_day,
-        "normal_day_cap": NORMAL_MAX_CAP if is_normal_day else None,
-        "recent_context": {
-            "previous_3_days": prev_3_days,
-            "previous_3_day_avg": f"{round(prev_3_day_avg, 2)}%" if prev_3_day_avg is not None else None,
-            "previous_week": prev_week_info
-        }
+        "predicted_absentees_percentage": f"{round(float(model_prediction), 2)}%"
     })
 
 
