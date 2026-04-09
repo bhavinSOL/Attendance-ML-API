@@ -1,9 +1,10 @@
 flask
+flask-cors
 fastapi
 uvicorn
 pandas
 numpy
 scikit-learn
 openpyxl
-gunicorn
-flask-cors
+PyGithub
+python-dotenv

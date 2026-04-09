@@ -4,6 +4,13 @@ import pandas as pd
 import numpy as np
 import pickle
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+import base64
+from github import Github, GithubException
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -383,6 +390,86 @@ def predict_range():
         current += timedelta(days=1)
 
     return jsonify(results)
+
+
+# -------- GITHUB API ENDPOINTS --------
+
+@app.route("/github/update-csv", methods=["POST"])
+def update_csv_github():
+    """
+    Update CSV file in GitHub repository.
+    Expected JSON body:
+    {
+        "filename": "2026_calander.csv" or "attendance.csv",
+        "content": "CSV content as string",
+        "message": "Commit message"
+    }
+    """
+    try:
+        data = request.get_json()
+        filename = data.get("filename")
+        content = data.get("content")
+        message = data.get("message", f"Update {filename}")
+
+        if not filename or not content:
+            return jsonify({"error": "Missing filename or content"}), 400
+
+        # Get GitHub credentials from environment
+        github_token = os.environ.get("GITHUB_TOKEN")
+        github_repo = os.environ.get("GITHUB_REPO", "bhavinSOL/TATA-Attendance")
+
+        if not github_token:
+            return jsonify({
+                "error": "GitHub token not configured. Please set GITHUB_TOKEN environment variable.",
+                "fallback": True
+            }), 500
+
+        # Initialize GitHub client
+        g = Github(github_token)
+        repo = g.get_repo(github_repo)
+
+        # Path in repository
+        file_path = f"public/{filename}"
+
+        try:
+            # Try to get existing file to update it
+            contents = repo.get_contents(file_path)
+            repo.update_file(
+                path=file_path,
+                message=message,
+                content=content,
+                sha=contents.sha
+            )
+            return jsonify({
+                "success": True,
+                "message": f"{filename} updated successfully in GitHub"
+            }), 200
+        except GithubException as e:
+            if e.status == 404:
+                # File doesn't exist, create it
+                repo.create_file(
+                    path=file_path,
+                    message=message,
+                    content=content
+                )
+                return jsonify({
+                    "success": True,
+                    "message": f"{filename} created successfully in GitHub"
+                }), 201
+            else:
+                raise e
+
+    except GithubException as e:
+        return jsonify({
+            "error": f"GitHub API error: {str(e)}",
+            "fallback": True
+        }), 500
+    except Exception as e:
+        print(f"Error updating CSV on GitHub: {e}")
+        return jsonify({
+            "error": str(e),
+            "fallback": True
+        }), 500
 
 
 # ---------------- RUN ---------------- #
