@@ -8,3 +8,4 @@ scikit-learn
 openpyxl
 PyGithub
 python-dotenv
+gunicorn
