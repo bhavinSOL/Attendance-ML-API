@@ -20,6 +20,41 @@ CORS(app)
 with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 
+# ---------------- LOAD ADMIN PASSWORD FROM CSV ---------------- #
+
+import os
+PUBLIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
+PASSWORDS_CSV_PATH = os.path.join(PUBLIC_DIR, 'passwords.csv')
+PASSWORDS_CSV_URL = (
+    "https://raw.githubusercontent.com/"
+    "bhavinSOL/TATA-Attendance/refs/heads/main/public/passwords.csv"
+)
+
+def load_admin_password():
+    """Load admin password from local CSV or remote URL"""
+    try:
+        # Try remote first
+        pwd_df = pd.read_csv(PASSWORDS_CSV_URL)
+        admin_row = pwd_df[pwd_df['username'] == 'admin']
+        if len(admin_row) > 0:
+            return str(admin_row.iloc[0]['password'])
+    except:
+        pass
+
+    # Fallback to local
+    try:
+        pwd_df = pd.read_csv(PASSWORDS_CSV_PATH)
+        admin_row = pwd_df[pwd_df['username'] == 'admin']
+        if len(admin_row) > 0:
+            return str(admin_row.iloc[0]['password'])
+    except:
+        pass
+
+    return "admin123"  # Default fallback
+
+ADMIN_PASSWORD = load_admin_password()
+print(f"✅ Loaded admin password from CSV")
+
 # ---------------- LOAD CALENDAR ---------------- #
 
 import os
@@ -243,39 +278,16 @@ def predict_day():
     })
 
 
-# ---------------- HELPER: cap prediction for a date ---------------- #
+# ---------------- HELPER: Simple model prediction for all endpoints ---------------- #
 
 def smart_predict(date):
     """
-    Full hybrid prediction for any single date:
-    model + prev 3 working days + prev week actual data + normal-day cap.
-    Used by all endpoints (day, week, month, range).
+    Simple model prediction without hybrid logic.
+    Just returns the pure model prediction based on features.
     """
     features = build_features(date)
     model_pred = model.predict(features)[0]
-
-    dt = pd.to_datetime(date)
-    cal_row = calendar_df[calendar_df["date"] == dt]
-    is_holiday = int(cal_row.iloc[0].get("is_holiday", 0)) if len(cal_row) > 0 else 0
-    is_festival = int(cal_row.iloc[0].get("is_festival", 0)) if len(cal_row) > 0 else 0
-    is_normal_day = (is_holiday == 0 and is_festival == 0)
-
-    # Holidays/Sundays/Off days: use pure model prediction (no hybrid, no cap)
-    if not is_normal_day:
-        return model_pred
-
-    # Normal working days: hybrid with prev actual data + cap
-    _, prev_3_day_avg = get_previous_days_attendance(
-        date, num_days=3, only_working_days=True
-    )
-    prev_week_info = get_previous_week_attendance(
-        date, only_working_days=True
-    )
-    prev_week_avg = prev_week_info["previous_week_avg"]
-
-    result = hybrid_prediction(model_pred, prev_3_day_avg, prev_week_avg, is_normal_day=True)
-
-    return result
+    return model_pred
 
 
 # ---------------- WEEK ---------------- #
@@ -430,6 +442,114 @@ def update_csv_github():
         return jsonify({
             "error": str(e),
             "fallback": True
+        }), 500
+
+
+# -------- PASSWORD CHANGE ENDPOINT --------
+
+@app.route("/auth/verify-password", methods=["POST"])
+def verify_password():
+    """
+    Verify current admin password.
+    Expected JSON body:
+    {
+        "currentPassword": "password_to_verify"
+    }
+    """
+    try:
+        data = request.get_json()
+        current_password = data.get("currentPassword", "")
+
+        if current_password == ADMIN_PASSWORD:
+            return jsonify({
+                "success": True,
+                "message": "Password verified successfully"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Incorrect password"
+            }), 401
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+@app.route("/auth/change-password", methods=["POST"])
+def change_password():
+    """
+    Change admin password and save to passwords.csv
+    Expected JSON body:
+    {
+        "oldPassword": "current_password",
+        "newPassword": "new_password"
+    }
+    """
+    global ADMIN_PASSWORD
+
+    try:
+        data = request.get_json()
+        old_password = data.get("oldPassword", "")
+        new_password = data.get("newPassword", "")
+
+        if not old_password or not new_password:
+            return jsonify({
+                "error": "Missing old or new password"
+            }), 400
+
+        # Verify old password
+        if old_password != ADMIN_PASSWORD:
+            return jsonify({
+                "success": False,
+                "error": "Old password is incorrect"
+            }), 401
+
+        # Update in-memory password
+        ADMIN_PASSWORD = new_password
+
+        # Update passwords.csv
+        pwd_df = pd.DataFrame({'username': ['admin'], 'password': [new_password]})
+        pwd_df.to_csv(PASSWORDS_CSV_PATH, index=False)
+
+        # Also update on GitHub
+        try:
+            github_token = os.environ.get("GITHUB_TOKEN")
+            github_repo = os.environ.get("GITHUB_REPO", "bhavinSOL/TATA-Attendance")
+
+            if github_token:
+                g = Github(github_token)
+                repo = g.get_repo(github_repo)
+                file_path = "public/passwords.csv"
+
+                try:
+                    contents = repo.get_contents(file_path)
+                    repo.update_file(
+                        path=file_path,
+                        message="Update admin password",
+                        content=pwd_df.to_csv(index=False),
+                        sha=contents.sha
+                    )
+                except GithubException as e:
+                    if e.status == 404:
+                        repo.create_file(
+                            path=file_path,
+                            message="Create passwords file",
+                            content=pwd_df.to_csv(index=False)
+                        )
+        except Exception as e:
+            print(f"⚠️ GitHub update failed: {e}")
+
+        return jsonify({
+            "success": True,
+            "message": "Password changed successfully"
+        }), 200
+
+    except Exception as e:
+        print(f"Error changing password: {e}")
+        return jsonify({
+            "error": str(e)
         }), 500
 
 
